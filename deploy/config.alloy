@@ -1,0 +1,89 @@
+// This Grafana Alloy config relies on some environment variables being
+// available to the Alloy container. See `env()` functions.
+
+// Logs
+
+logging {
+  level  = "info"
+  format = "logfmt"
+  write_to = [loki.write.grafanacloud.receiver]
+}
+
+discovery.docker "linux" {
+  host = "unix:///var/run/docker.sock"
+  filter {
+    name = "name"
+    values = ["flamebin-qa", "flamebin-prod", "alloy"]
+  }
+}
+
+discovery.relabel "docker" {
+    targets = []
+    rule {
+        source_labels = ["__meta_docker_container_name"]
+        regex         = "/(.*)"
+        target_label  = "container"
+    }
+}
+
+loki.source.docker "default" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.linux.targets
+  labels        = {"source" = "docker"}
+  relabel_rules = discovery.relabel.docker.rules
+  forward_to    = [loki.write.grafanacloud.receiver]
+}
+
+loki.write "grafanacloud" {
+  endpoint {
+    url = "https://logs-prod-012.grafana.net/loki/api/v1/push"
+    basic_auth {
+      username = env("LOKI_USERNAME")
+      password = env("LOKI_PASSWORD")
+    }
+  }
+}
+
+// Metrics
+
+prometheus.exporter.unix "host" {
+}
+
+prometheus.scrape "host" {
+  targets         = prometheus.exporter.unix.host.targets
+  forward_to      = [prometheus.relabel.filter_metrics.receiver]
+  scrape_interval = "10s"
+}
+
+prometheus.scrape "app" {
+  targets = [{"__address__" = "flamebin-qa:9090", "env" = "qa"},
+             {"__address__" = "flamebin-prod:9090", "env" = "prod"}]
+  forward_to = [prometheus.relabel.filter_metrics.receiver]
+  scrape_interval = "10s"
+  metrics_path    = "/"
+}
+
+prometheus.relabel "filter_metrics" {
+  rule {
+    action        = "labeldrop"
+    regex         = "instance"
+  }
+
+  rule {
+    action        = "drop"
+    source_labels = ["__name__"]
+    regex         = "node_scrape_.*"
+  }
+
+  forward_to = [prometheus.remote_write.grafanacloud.receiver]
+}
+
+prometheus.remote_write "grafanacloud" {
+  endpoint {
+    url = "https://prometheus-prod-24-prod-eu-west-2.grafana.net/api/prom/push"
+    basic_auth {
+      username = env("PROM_USERNAME")
+      password = env("PROM_PASSWORD")
+    }
+  }
+}
