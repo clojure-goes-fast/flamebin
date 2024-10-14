@@ -1,0 +1,107 @@
+version: "3.9"
+
+services:
+  traefik:
+    image: traefik:3.1.6
+    container_name: traefik
+    command:
+      # - --log.level=DEBUG
+      # - --accesslog=true
+      - --api.insecure=true
+      - --providers.docker
+      - --providers.docker.exposedbydefault=false
+      - --entryPoints.web.address=:80
+    networks:
+      - shared
+    ports:
+      - 80:80
+      # The Web UI (enabled by --api.insecure=true)
+      - 127.0.0.1:8086:8080
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: alloy
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - --stability.level=experimental
+      - /etc/alloy/config.alloy
+    networks:
+      - shared
+    ports:
+      - 127.0.0.1:12345:12345
+    env_file:
+      - .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config.alloy:/etc/alloy/config.alloy
+    restart: unless-stopped
+
+  ## QA zone
+
+  flamebin-qa:
+    container_name: flamebin-qa
+    build:
+      context: /flamebin/qa/flamebin.dev/
+      dockerfile: deploy/Dockerfile
+    networks:
+      - shared
+    expose:
+      - 80
+      - 9090
+    environment:
+      - ENV=qa
+      - STORAGE__PATH=/storage
+      - DB__PATH=/storage/db/main.db
+      - SERVER__HOST=qa.flamebin.dev
+      - SERVER__PORT=80
+      - METRICS__LOCAL_PORT=9090
+    env_file:
+      - .env
+    volumes:
+      - /flamebin/qa/storage:/storage
+    labels:
+      traefik.enable: true
+      traefik.http.services.flamebin-qa.loadbalancer.server.port: 80
+      traefik.http.routers.flamebin-qa.rule: Host(`qa.flamebin.dev`)
+      traefik.http.routers.flamebin-qa.entrypoints: web
+    restart: unless-stopped
+
+  ## Prod zone
+
+  flamebin-prod:
+    container_name: flamebin-prod
+    build:
+      context: /flamebin/prod/flamebin.dev/
+      dockerfile: deploy/Dockerfile
+    networks:
+      - shared
+    expose:
+      - 80
+      - 9090
+    environment:
+      - ENV=prod
+      - STORAGE__PATH=/storage
+      - DB__PATH=/storage/db/main.db
+      - SERVER__HOST=flamebin.dev
+      - SERVER__PORT=80
+      - METRICS__LOCAL_PORT=9090
+    env_file:
+      - .env
+    volumes:
+      - /flamebin/prod/storage:/storage
+    labels:
+      traefik.enable: true
+      traefik.http.services.flamebin-prod.loadbalancer.server.port: 80
+      traefik.http.routers.flamebin-prod.rule: Host(`flamebin.dev`)
+      traefik.http.routers.flamebin-prod.entrypoints: web
+    restart: unless-stopped
+
+networks:
+  shared:
+    name: shared
