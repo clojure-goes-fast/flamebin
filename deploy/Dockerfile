@@ -9,7 +9,7 @@ RUN --mount=type=cache,target=/root/.m2 clojure -T:build copy-deps :target-dir '
 ADD res ./res
 ADD src ./src
 
-CMD ["java", "-cp", "deps-jars/*:src:res", "clojure.main", "-m", "flamebin.main"]
+CMD ["java", "-cp", "deps-jars/*:src:res", "-Dclojure.main.report=stderr", "clojure.main", "-m", "flamebin.main"]
 
 # FROM openjdk:11-jre-slim
 
