@@ -83,7 +83,7 @@
     (let [sw (ms/stopwatch)
           {:keys [status] :as response} (handler request)
           path (or (:template (::r/match request)) "unknown")]
-      (sw "app.http.response_time" {:path path, :code status})
+      (sw "app.http.response_time" {:path path, :code (or status 200)})
       response)))
 
 (defn wrap-restore-remote-addr
@@ -143,7 +143,8 @@
   (let [{:keys [profile-id]} path-params]
     (when-not (valid-id? profile-id)
       (raise 404 (str "Invalid profile ID: " profile-id)))
-    {:headers {"content-type" "text/html"}
+    {:status 200
+     :headers {"content-type" "text/html"}
      :body (core/render-profile profile-id (query-params "read_password"))}))
 
 (defn $public-resource [req]

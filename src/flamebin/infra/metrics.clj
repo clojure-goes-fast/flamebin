@@ -5,6 +5,10 @@
 
 (mount/defstate registry
   :start (let [reg (PrometheusMeterRegistry. PrometheusConfig/DEFAULT)]
+           (.bindTo (io.micrometer.core.instrument.binder.jvm.ClassLoaderMetrics.) reg)
+           (.bindTo (io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics.) reg)
+           (.bindTo (io.micrometer.core.instrument.binder.jvm.JvmGcMetrics.) reg)
+           (.bindTo (io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics.) reg)
            (.add (Metrics/globalRegistry) reg)
            reg))
 
