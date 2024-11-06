@@ -1,10 +1,10 @@
 (ns flamebin.web
   (:require [flamebin.config :refer [config]]
             [flamebin.core :as core]
+            [flamebin.dto :refer [->UploadProfileRequest]]
             [flamebin.infra.metrics :as ms]
-            [flamebin.dto :refer [global-transformer UploadProfileRequest]]
             [flamebin.rate-limiter :as rl]
-            [flamebin.util :refer [new-id raise valid-id?]]
+            [flamebin.util :refer [raise valid-id?]]
             [flamebin.util.streams :as streams]
             [flamebin.web.pages :as pages]
             [malli.core :as m]
@@ -105,27 +105,30 @@
                  (@rl/global-processed-kbytes-limiter length-kb))
     (raise 429 "Upload processed bytes limit reached.")))
 
-(defn- format-profile-location [router profile-id]
-  (format "https://%s%s"
+(defn- profile-url [router profile-id read-password]
+  (format "https://%s%s%s"
           (@config :server :host)
           (-> (r/match-by-name router ::profile-page {:profile-id profile-id})
-              r/match->path)))
+              r/match->path)
+          (if read-password
+            (str "?read_password=" read-password)
+            "")))
 
-(defn $upload-profile [{:keys [remote-addr body query-params] :as req}]
+(defn $upload-profile [{:keys [remote-addr body query-params], router ::r/router
+                        :as req}]
   (let [length-kb (quot (ensure-content-length req) 1024)]
     (ensure-processed-limits remote-addr length-kb)
-    (let [id (new-id)
-          {:strs [format kind event]} query-params
-          ;; TODO: probably better validate on routes level.
-          valid-request (m/coerce UploadProfileRequest
-                                  {:id id, :format format, :event event
-                                   :kind (or kind :flamegraph)}
-                                  global-transformer)]
-      (core/save-profile body remote-addr valid-request)
+    ;; TODO: probably better validate in routes coercion.
+    (let [{:strs [kind type private], pformat "format"} query-params
+          req' (->UploadProfileRequest pformat (or kind :flamegraph) type
+                                       (= private "true"))
+
+          {:keys [id read_password] :as profile} (core/save-profile body remote-addr req')]
       {:status 201
-       :headers {"Location" (format-profile-location (::r/router req) id)
-                 "X-Created-ID" (str id)}
-       :body {:id id, :owner remote-addr}})))
+       :headers (cond-> {"Location" (profile-url router id read_password)
+                         "X-Created-ID" (str id)}
+                    read_password (assoc "X-Read-Password" read_password))
+       :body profile})))
 
 ;; Endpoints: web pages
 
@@ -135,15 +138,13 @@
 (defn $page-list-profiles [req]
   (resp (pages/index-page)))
 
-(defn $list-profiles [req]
-  (resp (flamebin.db/list-profiles)))
-
-(defn $render-profile [{:keys [path-params] :as req}]
+(defn $render-profile [{:keys [path-params query-params] :as req}]
+  ;; TODO: define read_password in routes.
   (let [{:keys [profile-id]} path-params]
     (when-not (valid-id? profile-id)
       (raise 404 (str "Invalid profile ID: " profile-id)))
     {:headers {"content-type" "text/html"}
-     :body (core/render-profile profile-id)}))
+     :body (core/render-profile profile-id (query-params "read_password"))}))
 
 (defn $public-resource [req]
   (ring.middleware.resource/resource-request req ""))

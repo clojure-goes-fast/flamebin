@@ -42,12 +42,12 @@
        [:html
         [:head
          [:link {:rel "icon" :href "/public/img/icon.png" :type "image/png"}]
-         [:title "flamebin.dev"]]
+         [:title "Flamebin"]]
         [:body
          [:center [:h1 "Flamebin"]]
          [:center [:h5 "Pastebin for your flamegraphs"]]
          [:div {:style "display:flex; justify-content:center"}
           [:ul
-           (for [p (core/list-profiles)]
+           (for [p (core/list-public-profiles)]
              [:li (format-ts (:upload_ts p)) " - " [:a {:href (format "/%s" (:id p))} (:id p)] ])]]
          [:center [:p [:a {:href "/profiles/upload"} "Upload another"]]]]])))

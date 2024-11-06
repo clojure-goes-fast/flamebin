@@ -21,20 +21,22 @@
   (with-temp-db
     (is (= [] (db/list-profiles)))))
 
+(def ^:private inst1 (java.time.Instant/ofEpochSecond 1234567890))
+
 (deftest manual-test
   (with-temp-db
-    (db/insert-profile {:id "QcXAqvnF3G" :file_path "some-path.dpf"
-                        :profile_type "cpu" :sample_count 12345 :owner nil})
-    (is (= {:id "QcXAqvnF3G" :file_path "some-path.dpf" :owner nil
-            :sample_count 12345, :profile_type :cpu}
-           (dissoc (db/get-profile "QcXAqvnF3G") :upload_ts)))
+    (db/insert-profile (dto/->Profile "QcXAqvnF3G" "some-path.dpf" "cpu" 12345
+                                      nil "alhdslfglksjdfhg" inst1))
+    (is (= {:id "QcXAqvnF3G", :file_path "some-path.dpf", :profile_type :cpu,
+            :upload_ts inst1, :sample_count 12345, :owner nil, :read_password "alhdslfglksjdfhg"}
+           (db/get-profile "QcXAqvnF3G")))
     (is (inst? (:upload_ts (db/get-profile "QcXAqvnF3G"))))
 
-    (db/insert-profile {:id "tX8nuc5K8v" :file_path "another-path.dpf"
-                        :profile_type "alloc" :sample_count 54321 :owner "me"})
-    (is (= {:id "tX8nuc5K8v", :file_path "another-path.dpf",
-            :owner "me", :sample_count 54321, :profile_type :alloc}
-           (dissoc (db/get-profile "tX8nuc5K8v") :upload_ts)))))
+    (db/insert-profile (dto/->Profile "tX8nuc5K8v" "another-path.dpf" "alloc" 54321
+                                      "me" nil inst1))
+    (is (= {:id "tX8nuc5K8v", :file_path "another-path.dpf", :read_password nil
+            :owner "me", :sample_count 54321, :profile_type :alloc, :upload_ts inst1}
+           (db/get-profile "tX8nuc5K8v")))))
 
 ;;;; Generative testing
 
@@ -45,12 +47,11 @@
 (defspec generative-insert-list-test
   (tc.prop/for-all
    ;; Disable shrinking because it does little but slows down testing.
-   [inserts (gen/vector (malli.generator/generator dto/Profile) 10 200)
-    remove-ts? gen/boolean]
+   [inserts (gen/vector (malli.generator/generator dto/Profile) 10 200)]
    (timbre/with-min-level :warn
      (with-temp-db
-       (let [inserts (mapv #(maybe-remove-ts % remove-ts?) inserts)]
-         (run! db/insert-profile inserts)
-         (let [fetched (mapv #(maybe-remove-ts % remove-ts?) (db/list-profiles))]
-           (and (= (count inserts) (count (db/list-profiles)))
-                (= (set inserts) (set fetched)))))))))
+       (run! db/insert-profile inserts)
+       (let [fetched (db/list-profiles)
+             no-pwd (fn [l] (mapv #(dissoc % :read_password) l))]
+         (and (= (count inserts) (count (db/list-profiles)))
+              (= (set (no-pwd inserts)) (set (no-pwd fetched)))))))))

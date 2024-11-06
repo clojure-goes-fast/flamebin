@@ -1,6 +1,6 @@
 (ns flamebin.db
   (:require [flamebin.config :refer [config]]
-            [flamebin.dto :refer [global-transformer Profile]]
+            [flamebin.dto :refer [coerce Profile]]
             [flamebin.util :refer [new-id raise with-locking]]
             [malli.core :as m]
             [migratus.core :as migratus]
@@ -37,51 +37,46 @@
 
 ;;;; DB interaction
 
-(defn- now []
-  (.toInstant (java.util.Date.)))
-
-#_((requiring-resolve 'malli.generator/sample) Profile)
-
 (defn insert-profile [profile]
-  (let [{:keys [id file_path profile_type sample_count owner upload_ts]}
-        (m/coerce Profile (update profile :upload_ts #(or % (now))) global-transformer)]
+  (m/assert Profile profile)
+  (let [{:keys [id file_path profile_type sample_count owner upload_ts
+                read_password]} profile]
     (log/infof "Inserting profile %s from %s" id owner)
     (with-locking db-lock
       (sql-helpers/insert! (db-options) :profile
-                           {:id id
-                            :file_path file_path
-                            :profile_type (name profile_type)
-                            :upload_ts (str upload_ts)
-                            :sample_count sample_count
-                            :owner owner}))))
-
-(defn find-dpf-file [profile-id]
-  (with-locking db-lock
-    (let [q ["SELECT file_path FROM profile WHERE id = ?" profile-id]]
-      (if-some [row (jdbc/execute-one! (db-options) q)]
-        (:profile/file_path row)
-        (let [msg (format "Profile with ID '%s' not found." profile-id)]
-          (log/error msg)
-          (raise 404 msg))))))
+                           {:id            id
+                            :file_path     file_path
+                            :profile_type  (name profile_type)
+                            :upload_ts     (str upload_ts)
+                            :sample_count  sample_count
+                            :read_password read_password
+                            :owner         owner}))
+    profile))
 
 (defn list-profiles []
   (with-locking db-lock
     (->> (jdbc/execute! (db-options) ["SELECT id, file_path, profile_type, sample_count, owner, upload_ts FROM profile"])
-         (mapv #(m/coerce Profile (update-keys % (comp keyword name)) global-transformer)))))
+         (mapv #(-> (update-keys % (comp keyword name))
+                    (assoc :read_password nil)
+                    (coerce Profile))))))
 
-(defn list-latest-profiles [n]
+(defn list-public-profiles [n]
   (with-locking db-lock
-    (->> (jdbc/execute! (db-options) ["SELECT id, file_path, profile_type, sample_count, owner, upload_ts FROM profile ORDER BY upload_ts DESC LIMIT ?" n])
-         (mapv #(m/coerce Profile (update-keys % (comp keyword name)) global-transformer)))))
+    (->> (jdbc/execute! (db-options) ["SELECT id, file_path, profile_type, sample_count, owner, upload_ts, read_password FROM profile
+WHERE read_password IS NULL ORDER BY upload_ts DESC LIMIT ?" n])
+         (mapv #(-> (update-keys % (comp keyword name))
+                    (coerce Profile))))))
 
 (defn get-profile [profile-id]
   (with-locking db-lock
-    (let [q ["SELECT id, file_path, profile_type, sample_count, owner, upload_ts FROM profile WHERE id = ?" profile-id]]
-      (if-some [row (update-keys (jdbc/execute-one! (db-options) q) (comp keyword name))]
-        (m/coerce Profile row global-transformer)
-        (let [msg (format "Profile with ID '%s' not found." profile-id)]
-          (log/error msg)
-          (raise 404 msg))))))
+    (let [q ["SELECT id, file_path, profile_type, sample_count, owner, upload_ts, read_password FROM profile WHERE id = ?" profile-id]
+          row (some-> (jdbc/execute-one! (db-options) q)
+                      (update-keys (comp keyword name))
+                      (coerce Profile))]
+      (or row
+          (let [msg (format "Profile with ID '%s' not found." profile-id)]
+            (log/error msg)
+            (raise 404 msg))))))
 
 (defn clear-db []
   (with-locking db-lock
