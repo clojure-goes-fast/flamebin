@@ -42,7 +42,7 @@
              :host {:type :string
                     :required true
                     :description "host where the server is deployed to"
-                    :default #(when (= (cfg/get :env) :local) "localhost")}}}
+                    :default #(when (= (cfg/get :env) :local) (str "localhost:" (cfg/get :server :port)))}}}
 
    :limits {:nested
             {:gzip-max-expansion {:type :number

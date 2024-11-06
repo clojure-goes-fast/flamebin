@@ -14,6 +14,9 @@ config ;; Don't remove.
    mt/string-transformer
    malli.experimental.time.transform/time-transformer))
 
+(defn coerce [value schema]
+  (m/coerce schema value global-transformer))
+
 ;;;; Profile
 
 (def Profile
@@ -21,19 +24,19 @@ config ;; Don't remove.
    {:id :nano-id
     :file_path [:and {:gen/fmap #(str % ".dpf")} :string]
     :profile_type :keyword
+    :sample_count [:maybe nat-int?]
+    :owner [:maybe :string]
+    :read_password [:maybe :string]
     :upload_ts [:and {:gen/gen (gen/fmap Instant/ofEpochSecond
                                          (gen/choose 1500000000 1700000000))}
-                :time/instant]
-    :sample_count [:maybe nat-int?]
-    :owner [:maybe string?]}))
+                :time/instant]}))
 
 (defn ->Profile
-  ([id file_path profile_type sample_count owner upload_ts]
-   (let [obj {:id id, :file_path file_path, :profile_type profile_type,
-              :upload_ts upload_ts, :sample_count sample_count, :owner owner}]
-     (m/coerce Profile obj global-transformer)))
-  ([id file_path profile_type sample_count owner]
-   (->Profile id file_path profile_type sample_count owner (Instant/now))))
+  [id file_path profile_type sample_count owner read_password upload_ts]
+  (-> {:id id, :file_path file_path, :profile_type profile_type,
+       :upload_ts upload_ts, :sample_count sample_count, :owner owner
+       :read_password read_password}
+      (coerce Profile)))
 
 ;;;; DenseProfile
 
@@ -43,15 +46,19 @@ config ;; Don't remove.
              [:id->frame [:vector string?]]
              [:total-samples {:optional true} pos-int?]]))
 
-#_((requiring-resolve 'malli.generator/sample) DenseProfile)
+#_((requiring-resolve 'malli.generator/sample) Profile)
 
 ;;;; UploadProfileRequest
 
 (def UploadProfileRequest
   (mlite/schema
-   {:id :nano-id
-    :format [:enum :collapsed :dense-edn]
+   {:profile-format [:enum :collapsed :dense-edn]
     :kind [:enum :flamegraph :diffgraph]
-    :event [:re #"[\w\.]+"]}))
+    :type [:re #"[\w\.]+"]
+    :private? :boolean}))
 
-#_(malli.core/coerce UploadProfileRequest {:id "h8JsY4Sg7y" :format "collapsed", :event "cpu", :kind :diffgraph} global-transformer)
+(defn ->UploadProfileRequest [profile-format kind type private?]
+  (-> {:profile-format profile-format, :kind kind, :type type, :private? private?}
+      (coerce UploadProfileRequest)))
+
+#_(->UploadProfileRequest "collapsed" "diffgraph" "cpu" true)
