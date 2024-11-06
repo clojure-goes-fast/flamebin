@@ -1,8 +1,14 @@
 (ns flamebin.main
-  (:require [flamebin.db :as db]
+  (:require [clojure.pprint :refer [pprint]]
+            [flamebin.db :as db]
+            flamebin.infra.repl
             [flamebin.web :as web]
             [mount.extensions.basic :as mount.ext]
-            [mount.lite :as mount]))
+            [mount.lite :as mount]
+            [taoensso.timbre :as log]))
+
+;; Don't remove
+flamebin.infra.repl/nrepl-server
 
 (defn -main [& args]
   ;; Start internal machinery first.
@@ -13,4 +19,5 @@
     (mount/start))
   ;; Only then start the main server.
   (mount.extensions.basic/with-only [#'web/server]
-    (mount/start)))
+    (mount/start))
+  (log/info "Component status:\n" (with-out-str (pprint (mount/status)))))

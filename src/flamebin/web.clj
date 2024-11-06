@@ -72,7 +72,7 @@
 
                      (= type ::m/coercion)
                      (do (log/warn "Malli error" data)
-                         (resp 422 (str "Validation error: "
+                         (resp 400 (str "Validation error: "
                                         (malli.error/humanize (:explain data)))))
 
                      :else (ISE ex))))
@@ -204,7 +204,7 @@
    (ring/redirect-trailing-slash-handler)))
 
 (mount/defstate prom-server
-  :start (let [port (@config :metrics :local-port)]
+  :start (let [port (@config :metrics :port)]
            (log/infof "Starting Prometheus exporter on port %d" port)
            (server/run-server #'prom-app {:port port}))
   :stop (@prom-server))

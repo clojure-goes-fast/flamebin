@@ -68,8 +68,14 @@
                        :rps    (number 0.5 #_=1.5KB/s)}}}}
 
    :metrics {:nested
-             {:local-port {:type :number
-                           :default 9090}}}})
+             {:port {:type :number
+                     :default 9090}}}
+
+   :repl {:nested
+          {:enabled {:type :boolean
+                     :default false}
+           :port {:type :number
+                  :required #(cfg/get :repl :enabled)}}}})
 
 (defn init-config []
   (cfg/populate-from-env)

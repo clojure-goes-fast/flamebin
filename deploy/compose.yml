@@ -54,13 +54,16 @@ services:
     expose:
       - 80
       - 9090
+    ports:
+      - 127.0.0.1:9998:9998
     environment:
       - ENV=qa
       - STORAGE__PATH=/storage
       - DB__PATH=/storage/db/main.db
       - SERVER__HOST=qa.flamebin.dev
       - SERVER__PORT=80
-      - METRICS__LOCAL_PORT=9090
+      - REPL__ENABLED=true
+      - REPL__PORT=9998
     env_file:
       - .env
     volumes:
@@ -84,13 +87,16 @@ services:
     expose:
       - 80
       - 9090
+    ports:
+      - 127.0.0.1:9999:9999
     environment:
       - ENV=prod
       - STORAGE__PATH=/storage
       - DB__PATH=/storage/db/main.db
       - SERVER__HOST=flamebin.dev
       - SERVER__PORT=80
-      - METRICS__LOCAL_PORT=9090
+      - REPL__ENABLED=true
+      - REPL__PORT=9999
     env_file:
       - .env
     volumes:
