@@ -117,7 +117,7 @@
 (defn dense-edn-stream->dense-profile [^InputStream input-stream]
   (with-open [rdr (PushbackReader. (io/reader input-stream))]
     (let [profile (select-keys (edn/read rdr) [:stacks :id->frame :total-samples])]
-      (m/validate DenseProfile profile)
+      (m/assert DenseProfile profile)
       ;; Calculate total samples if not provided.
       (update profile :total-samples
               #(or % (transduce (map second) + 0 (:stacks profile)))))))

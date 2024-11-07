@@ -24,7 +24,7 @@
                          (form/file-upload {:id "fileInput"} "file")
                          (form/submit-button "Upload"))
            [:div#status]
-           [:a {:href "/"} "Back to home"]]]
+           [:a {:href "/"} "↰ Home"]]]
          [:script (h/raw (render-template
                           (slurp (io/resource "site/upload.js"))
                           {:upload-url "/api/v1/upload-profile?type=cpu&format=collapsed"}))]]])))

@@ -18,6 +18,7 @@
             [reitit.ring :as ring]
             [reitit.ring.coercion :as ring-coercion]
             [reitit.ring.middleware.parameters :refer [parameters-middleware]]
+            [ring.middleware.head]
             [ring.middleware.resource]
             [taoensso.timbre :as log])
   (:import clojure.lang.ExceptionInfo))
@@ -186,7 +187,9 @@
     {:data {:middleware [;; Needed for coercion to work.
                          ring-coercion/coerce-exceptions-middleware
                          ring-coercion/coerce-request-middleware]}})
-   (ring/redirect-trailing-slash-handler)))
+   (ring/redirect-trailing-slash-handler)
+   ;; This middleware should live outside of router because it impacts matching.
+   {:middleware [[ring.middleware.head/wrap-head]]}))
 
 (mount/defstate server
   :start (let [port (@config :server :port)]
