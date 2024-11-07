@@ -8,8 +8,9 @@ RUN --mount=type=cache,target=/root/.m2 clojure -T:build copy-deps :target-dir '
 
 ADD res ./res
 ADD src ./src
+COPY run.sh ./
 
-CMD ["java", "-cp", "deps-jars/*:src:res", "-Dclojure.main.report=stderr", "clojure.main", "-m", "flamebin.main"]
+CMD ["bash", "/app/run.sh"]
 
 # FROM openjdk:11-jre-slim
 
