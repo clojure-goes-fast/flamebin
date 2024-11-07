@@ -1,11 +1,8 @@
 (ns flamebin.util
-  (:require [malli.core :as m]
-            [nano-id.core :as nano-id]
-            [nano-id.random]
-            [clojure.test.check.generators :as gen]
-            [clojure.test.check.rose-tree :as rose])
-  (:import java.util.Base64
-           java.util.concurrent.locks.Lock))
+  (:require [clojure.test.check.generators :as gen]
+            [clojure.test.check.rose-tree :as rose]
+            [taoensso.encore :as encore])
+  (:import java.util.concurrent.locks.Lock))
 
 (defmacro with-locking [lock & body]
   (let [l (with-meta (gensym "lock") {:tag `Lock})]
@@ -14,27 +11,25 @@
        (try ~@body
             (finally (.unlock ~l))))))
 
-;;;; NanoID
+;;;; IDs and secrets
 
-(def ^:private id-size 10) ;; On the smaller side, may raise later.
+(def ^:private id-size 6) ;; Small, may raise later. We check for duplicates.
 (def ^:private secret-token-bytes 18)
 
 (def ^:private alphabet
   "Only alphanumeric, no ambiguous characters."
   "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
 
-(let [generator (nano-id/custom alphabet id-size)]
+(let [generator (encore/rand-id-fn {:chars :nanoid-readable, :len id-size})]
   (defn new-id [] (generator)))
 
-(let [validation-rx (re-pattern (format "[%s]{%d}" alphabet id-size))]
+(let [validation-rx (re-pattern (format "\\w{%d}" id-size))]
   (defn valid-id?
     "Check if the provided object looks like a valid nano-id in our system."
     [id]
-    (and (string? id)
-         (= (count id) id-size)
-         (re-matches validation-rx id))))
+    (and (string? id) (re-matches validation-rx id))))
 
-;#_(every? valid-id? (repeatedly 10000 new-id))
+#_(every? valid-id? (repeatedly 10000 new-id))
 
 (defn- gen-invoke
   "Given a 0-arg function `f`, return a generator that invokes it whenever a value
@@ -47,9 +42,8 @@
              :string
              [:fn valid-id?]]})
 
-(defn secret-token []
-  (.encodeToString (Base64/getUrlEncoder)
-                   (nano-id.random/random-bytes secret-token-bytes)))
+(let [generator (encore/rand-id-fn {:chars :alphanumeric, :len secret-token-bytes})]
+  (defn secret-token [] (generator)))
 
 #_(secret-token)
 

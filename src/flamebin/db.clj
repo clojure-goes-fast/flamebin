@@ -37,6 +37,19 @@
 
 ;;;; DB interaction
 
+(defn new-unused-id []
+  (loop [tries 5]
+    (if (<= tries 0)
+      (raise 500 "Can't create a proper unused ID.")
+      (let [id (new-id)
+            res (with-locking db-lock
+                  (jdbc/execute-one! (db-options) ["SELECT count(id) AS cnt FROM profile WHERE id = ?" id]))]
+        (if (zero? (:cnt res))
+          id
+          (recur (dec tries)))))))
+
+#_(new-unused-id)
+
 (defn insert-profile [profile]
   (m/assert Profile profile)
   (let [{:keys [id file_path profile_type sample_count owner upload_ts
