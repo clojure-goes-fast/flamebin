@@ -27,7 +27,7 @@
            [:a {:href "/"} "Back to home"]]]
          [:script (h/raw (render-template
                           (slurp (io/resource "site/upload.js"))
-                          {:upload-url "/api/v1/upload-profile?event=cpu&format=collapsed"}))]]])))
+                          {:upload-url "/api/v1/upload-profile?type=cpu&format=collapsed"}))]]])))
 
 (def ^:private ^DateTimeFormatter date-formatter
   (DateTimeFormatter/ofPattern "yyyy-MM-dd HH:mm:ss"))

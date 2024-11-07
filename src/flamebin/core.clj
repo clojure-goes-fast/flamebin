@@ -20,7 +20,7 @@
                   :dense-edn (proc/dense-edn-stream->dense-profile stream))
         dpf-array (proc/freeze profile)
         dpf-kb (quot (alength ^bytes dpf-array) 1024)
-        id (new-id)
+        id (db/new-unused-id)
         filename (format "%s.dpf" id)]
     (ensure-saved-limits ip dpf-kb)
     (storage/save-file dpf-array filename)
