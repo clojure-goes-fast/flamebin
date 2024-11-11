@@ -13,33 +13,36 @@
                  (@rl/global-saved-kbytes-limiter length-kb))
     (raise 429 "Upload saved bytes limit reached.")))
 
-(defn save-profile [stream ip {:keys [profile-format type private?]
+(defn save-profile [stream ip {:keys [profile-format type public?]
                                :as _upload-request}]
   (let [profile (case profile-format
                   :collapsed (proc/collapsed-stacks-stream->dense-profile stream)
                   :dense-edn (proc/dense-edn-stream->dense-profile stream))
-        dpf-array (proc/freeze profile)
+        edit-token (secret-token)
+        read-token (when-not public? (secret-token))
+        dpf-array (proc/freeze profile read-token)
         dpf-kb (quot (alength ^bytes dpf-array) 1024)
         id (db/new-unused-id)
         filename (format "%s.dpf" id)]
     (ensure-saved-limits ip dpf-kb)
     (storage/save-file dpf-array filename)
-    (db/insert-profile
-     ;; TODO: replace IP with proper owner at some point
-     (dto/->Profile id filename type (:total-samples profile) ip
-                    (when private? (secret-token)) (Instant/now)))))
+    ;; TODO: replace IP with proper owner at some point
+    (-> (dto/->Profile id filename type (:total-samples profile) ip
+                       edit-token public? (Instant/now))
+        db/insert-profile
+        ;; Attach read-token to the response here — it's not in the scheme
+        ;; because we don't store it in the DB.
+        (assoc :read-token read-token))))
 
-(defn render-profile [profile-id provided-read-password]
-  (let [{:keys [read_password file_path] :as profile} (db/get-profile profile-id)]
+(defn render-profile [profile-id read-token]
+  (let [{:keys [is_public file_path] :as profile} (db/get-profile profile-id)]
     ;; Authorization
-    (when read_password
-      (when (nil? provided-read-password)
-        (raise 403 "Required read-password to access this resource."))
-      (when (not= read_password provided-read-password)
-        (raise 403 "Incorrect read-password.")))
+    (when-not is_public
+      (when (nil? read-token)
+        (raise 403 "Required read-token to access this resource.")))
 
     (-> (storage/get-file file_path)
-        proc/read-compressed-profile
+        (proc/read-compressed-profile read-token)
         (render/render-html-flamegraph {}))))
 
 (defn list-public-profiles []
@@ -48,4 +51,4 @@
 (comment
   (save-profile
    (clojure.java.io/input-stream (clojure.java.io/file "test/res/normal.txt"))
-   "me" (dto/->UploadProfileRequest :collapsed :flamegraph "alloc" true)))
+   "me" (dto/->UploadProfileRequest :collapsed :flamegraph "alloc" false)))

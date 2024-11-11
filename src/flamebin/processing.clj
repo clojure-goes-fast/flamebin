@@ -1,19 +1,14 @@
 (ns flamebin.processing
-  (:require [clj-async-profiler.post-processing :as pp]
+  (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [taoensso.nippy :as nippy]
             [flamebin.dto :refer [DenseProfile]]
             [flamebin.util :refer [raise]]
             [malli.core :as m]
-            [jsonista.core :as json]
-            [flamebin.util :refer [raise]]
-            [clojure.edn :as edn])
+            [taoensso.nippy :as nippy])
   (:import clj_async_profiler.Helpers
-           (java.io BufferedReader InputStream)
-           (java.util HashMap HashMap$Node Map$Entry)
-           (java.util.function Consumer Function)
-           java.io.PushbackReader))
+           (java.io BufferedReader InputStream PushbackReader)
+           (java.util HashMap Map$Entry)))
 
 ;; Collapsed stacks:
 ;;    a;b;c 10
@@ -88,16 +83,15 @@
               .stream
               (.sorted (Map$Entry/comparingByKey))
               (.forEach
-               (reify Consumer
-                 (accept [_ entry]
-                   (let [stack (split-by-semicolon-and-transform-to-indices
-                                (.getKey ^Map$Entry entry) frame->id-map)
-                         value (.getValue ^Map$Entry entry)
-                         same (count-same stack (aget last-stack 0))
-                         dense-stack (into [same] (drop same stack))]
-                     (.add acc [dense-stack value])
-                     (aset last-stack 0 stack)
-                     (aset total-samples 0 (+ (aget total-samples 0) ^long value)))))))
+               (fn [^Map$Entry entry]
+                 (let [stack (split-by-semicolon-and-transform-to-indices
+                              (.getKey entry) frame->id-map)
+                       value (.getValue entry)
+                       same (count-same stack (aget last-stack 0))
+                       dense-stack (into [same] (drop same stack))]
+                   (.add acc [dense-stack value])
+                   (aset last-stack 0 stack)
+                   (aset total-samples 0 (+ (aget total-samples 0) ^long value))))))
         id->frame-arr (object-array (.size frame->id-map))]
     (run! (fn [[k v]] (aset id->frame-arr v k)) frame->id-map)
     {:stacks (vec acc)
@@ -106,8 +100,9 @@
 
 (def ^:private nippy-compressor nippy/zstd-compressor)
 
-(defn freeze [object]
-  (nippy/freeze object {:compressor nippy-compressor}))
+(defn freeze [object read-token]
+  (nippy/freeze object {:compressor nippy-compressor
+                        :password (when read-token [:salted read-token])}))
 
 (defn collapsed-stacks-stream->dense-profile [input-stream]
   (-> input-stream
@@ -122,8 +117,13 @@
       (update profile :total-samples
               #(or % (transduce (map second) + 0 (:stacks profile)))))))
 
-(defn read-compressed-profile [source-file]
-  (nippy/thaw-from-file source-file))
+(defn read-compressed-profile [source-file read-token]
+  (try (nippy/thaw-from-file source-file {:password (when read-token
+                                                      [:salted read-token])})
+       (catch clojure.lang.ExceptionInfo ex
+         (if (str/includes? (ex-message ex) "decryption")
+           (raise 403 "Failed to decrypt flamegraph, incorrect read-token.")
+           (throw ex)))))
 
 (comment
   (defn file-as-gzip-input-stream [file]
@@ -134,10 +134,13 @@
           (io/copy (io/file file) s))
         (.toByteArray baos)))))
 
-  (freeze
-   (intermediate-profile->dense-profile
-    (collapsed-stacks-stream->intermediate-profile
-     (file-as-gzip-input-stream "test/res/huge.txt"))))
+  (nippy/thaw
+   (freeze
+    (intermediate-profile->dense-profile
+     (collapsed-stacks-stream->intermediate-profile
+      (file-as-gzip-input-stream "test/res/normal.txt")))
+    "key1")
+   {:password  [:salted "key2"]})
 
   (with-open [w (io/writer (io/file "test/res/huge.edn"))]
     (binding [*out* w]

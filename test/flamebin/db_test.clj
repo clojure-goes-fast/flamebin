@@ -25,24 +25,22 @@
 
 (deftest manual-test
   (with-temp-db
-    (db/insert-profile (dto/->Profile "QcXAqvnF3G" "some-path.dpf" "cpu" 12345
-                                      nil "alhdslfglksjdfhg" inst1))
-    (is (= {:id "QcXAqvnF3G", :file_path "some-path.dpf", :profile_type :cpu,
-            :upload_ts inst1, :sample_count 12345, :owner nil, :read_password "alhdslfglksjdfhg"}
-           (db/get-profile "QcXAqvnF3G")))
-    (is (inst? (:upload_ts (db/get-profile "QcXAqvnF3G"))))
+    (db/insert-profile (dto/->Profile "QcXAqv" "some-path.dpf" "cpu" 12345
+                                      nil "alhdslfglksjdfhg" true inst1))
+    (is (= {:id "QcXAqv", :file_path "some-path.dpf", :profile_type :cpu,
+            :upload_ts inst1, :sample_count 12345, :owner nil, :is_public true
+            :edit_token "alhdslfglksjdfhg"}
+           (db/get-profile "QcXAqv")))
+    (is (inst? (:upload_ts (db/get-profile "QcXAqv"))))
 
-    (db/insert-profile (dto/->Profile "tX8nuc5K8v" "another-path.dpf" "alloc" 54321
-                                      "me" nil inst1))
-    (is (= {:id "tX8nuc5K8v", :file_path "another-path.dpf", :read_password nil
-            :owner "me", :sample_count 54321, :profile_type :alloc, :upload_ts inst1}
-           (db/get-profile "tX8nuc5K8v")))))
+    (db/insert-profile (dto/->Profile "tX8nuc" "another-path.dpf" "alloc" 54321
+                                      "me" nil false inst1))
+    (is (= {:id "tX8nuc", :file_path "another-path.dpf", :edit_token nil
+            :owner "me", :sample_count 54321, :profile_type :alloc, :is_public false
+            :upload_ts inst1}
+           (db/get-profile "tX8nuc")))))
 
 ;;;; Generative testing
-
-(defn- maybe-remove-ts [profile remove-ts?]
-  (cond-> profile
-    remove-ts? (dissoc :upload_ts)))
 
 (defspec generative-insert-list-test
   (tc.prop/for-all
@@ -52,6 +50,6 @@
      (with-temp-db
        (run! db/insert-profile inserts)
        (let [fetched (db/list-profiles)
-             no-pwd (fn [l] (mapv #(dissoc % :read_password) l))]
+             no-pwd (fn [l] (mapv #(dissoc % :edit_token) l))]
          (and (= (count inserts) (count (db/list-profiles)))
               (= (set (no-pwd inserts)) (set (no-pwd fetched)))))))))

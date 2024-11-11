@@ -106,13 +106,13 @@
                  (@rl/global-processed-kbytes-limiter length-kb))
     (raise 429 "Upload processed bytes limit reached.")))
 
-(defn- profile-url [router profile-id read-password]
+(defn- profile-url [router profile-id read-token]
   (format "https://%s%s%s"
           (@config :server :host)
           (-> (r/match-by-name router ::profile-page {:profile-id profile-id})
               r/match->path)
-          (if read-password
-            (str "?read_password=" read-password)
+          (if read-token
+            (str "?read-token=" read-token)
             "")))
 
 (defn $upload-profile [{:keys [remote-addr body query-params], router ::r/router
@@ -120,15 +120,15 @@
   (let [length-kb (quot (ensure-content-length req) 1024)]
     (ensure-processed-limits remote-addr length-kb)
     ;; TODO: probably better validate in routes coercion.
-    (let [{:strs [kind type private], pformat "format"} query-params
+    (let [{:strs [kind type public], pformat "format"} query-params
           req' (->UploadProfileRequest pformat (or kind :flamegraph) type
-                                       (= private "true"))
+                                       (= public "true"))
 
-          {:keys [id read_password] :as profile} (core/save-profile body remote-addr req')]
+          {:keys [id read-token] :as profile} (core/save-profile body remote-addr req')]
       {:status 201
-       :headers (cond-> {"Location" (profile-url router id read_password)
+       :headers (cond-> {"Location" (profile-url router id read-token)
                          "X-Created-ID" (str id)}
-                    read_password (assoc "X-Read-Password" read_password))
+                    read-token (assoc "X-Read-Token" read-token))
        :body profile})))
 
 ;; Endpoints: web pages
@@ -140,13 +140,13 @@
   (resp (pages/index-page)))
 
 (defn $render-profile [{:keys [path-params query-params] :as req}]
-  ;; TODO: define read_password in routes.
+  ;; TODO: define read_token in routes.
   (let [{:keys [profile-id]} path-params]
     (when-not (valid-id? profile-id)
       (raise 404 (str "Invalid profile ID: " profile-id)))
     {:status 200
      :headers {"content-type" "text/html"}
-     :body (core/render-profile profile-id (query-params "read_password"))}))
+     :body (core/render-profile profile-id (query-params "read-token"))}))
 
 (defn $public-resource [req]
   (ring.middleware.resource/resource-request req ""))
