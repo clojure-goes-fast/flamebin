@@ -84,6 +84,8 @@
 (mount/defstate config
   :start (do (init-config) (fn config-getter [& path] (apply cfg/get path))))
 
+#_(mount/start #'config)
+
 ;;;; Misc initialization
 
 (malli.registry/set-default-registry!
