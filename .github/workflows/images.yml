@@ -49,6 +49,9 @@ jobs:
         with:
           context: .
           file: deploy/Dockerfile
+          build-args: |
+            BUILD_VERSION=${{ env.DOCKER_METADATA_OUTPUT_VERSION }}
+            GIT_SHA=${{ github.sha }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
