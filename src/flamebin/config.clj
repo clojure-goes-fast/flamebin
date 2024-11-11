@@ -22,6 +22,17 @@
          :one-of [:local :qa :prod]
          :default :local}
 
+   :build {:nested
+           {:version {:type :string
+                      :default "unknown"
+                      :delayed-transform
+                      #(if (and (= % "unknown") (.exists (io/file "VERSION")))
+                         (slurp "VERSION") %)}
+            :git-sha {:type :string
+                      :default "master"
+                      :delayed-transform
+                      #(if (and (= % "master") (.exists (io/file "GIT_SHA")))
+                         (slurp "GIT_SHA") %)}}}
    :storage {:nested
              {:kind {:type :keyword
                      :default :disk}
