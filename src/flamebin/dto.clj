@@ -1,31 +1,12 @@
 (ns flamebin.dto
   (:require [clojure.test.check.generators :as gen]
-            [flamebin.config :refer [config]]
-            [malli.core :as m]
+            [flamebin.util.malli :as fmalli]
             [malli.experimental.lite :as mlite]
-            [malli.experimental.time.transform]
-            [malli.transform :as mt]
             [malli.util :as mu])
-  (:import java.time.Instant))
+  (:import (java.time Instant)))
 
-config ;; Don't remove.
-
-(def ^:private int-to-boolean
-  {:decoders
-   {:boolean #(cond (= % 1) true
-                    (= % 0) false
-                    :else %)}})
-
-(def global-transformer
-  (mt/transformer
-   mt/string-transformer
-   (mt/key-transformer {:decode keyword})
-   int-to-boolean
-   malli.experimental.time.transform/time-transformer
-   mt/default-value-transformer))
-
-(defn coerce [value schema]
-  (m/coerce schema value global-transformer))
+(def coerce fmalli/coerce)
+(reset-meta! #'coerce (meta #'fmalli/coerce))
 
 (defmacro ^:private defschema-and-constructor [schema-name schema-val]
   (assert (= (first schema-val) '->))

@@ -31,17 +31,6 @@
 
 #_(every? valid-id? (repeatedly 10000 new-id))
 
-(defn- gen-invoke
-  "Given a 0-arg function `f`, return a generator that invokes it whenever a value
-  needs to be generated."
-  [f]
-  (#'gen/make-gen (fn [& _] (rose/pure (f)))))
-
-(def nano-id-registry
-  {:nano-id [:and {:gen/gen (gen-invoke new-id)}
-             :string
-             [:fn {:error/message "Not valid ID"} valid-id?]]})
-
 (let [generator (encore/rand-id-fn {:chars :alphanumeric, :len secret-token-bytes})]
   (defn secret-token [] (generator)))
 

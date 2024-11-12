@@ -1,10 +1,6 @@
 (ns flamebin.config
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
-            flamebin.util
-            malli.core
-            malli.experimental.time
-            malli.registry
             [mount.lite :as mount]
             [omniconf.core :as cfg]
             [taoensso.timbre :as log]
@@ -93,11 +89,5 @@
 #_(mount/start #'config)
 
 ;;;; Misc initialization
-
-(malli.registry/set-default-registry!
- (malli.registry/composite-registry
-  (malli.core/default-schemas)
-  (malli.experimental.time/schemas)
-  flamebin.util/nano-id-registry))
 
 (taoensso.timbre.tools.logging/use-timbre)

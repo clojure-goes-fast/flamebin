@@ -5,12 +5,9 @@
             [flamebin.infra.metrics :as ms]
             [flamebin.rate-limiter :as rl]
             [flamebin.util :refer [raise valid-id?]]
-            [flamebin.util.streams :as streams]
+            [flamebin.web.middleware :refer :all]
             [flamebin.web.pages :as pages]
-            [malli.core :as m]
-            malli.error
             [mount.lite :as mount]
-            [muuntaja.core :as content]
             [muuntaja.middleware :as content.mw]
             [org.httpkit.server :as server]
             [reitit.coercion.malli]
@@ -20,9 +17,7 @@
             [reitit.ring.middleware.parameters :refer [parameters-middleware]]
             [ring.middleware.head]
             [ring.middleware.resource]
-            [taoensso.timbre :as log]
-            [flamebin.web.middleware :refer :all])
-  (:import clojure.lang.ExceptionInfo))
+            [taoensso.timbre :as log]))
 
 ;; Endpoints: API
 

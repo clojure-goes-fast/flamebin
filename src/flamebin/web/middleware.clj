@@ -1,14 +1,14 @@
 (ns flamebin.web.middleware
   (:require [flamebin.infra.metrics :as ms]
             [flamebin.util :refer [raise]]
+            [flamebin.util.malli :refer [coerce]]
             [flamebin.util.streams :as streams]
             [malli.core :as m]
-            [malli.experimental.lite]
             [malli.error]
+            [malli.experimental.lite]
             [muuntaja.core :as content]
             [reitit.ring :as ring]
-            [taoensso.timbre :as log]
-            [flamebin.dto :as dto])
+            [taoensso.timbre :as log])
   (:import (clojure.lang ExceptionInfo)))
 
 (defn resp
@@ -100,6 +100,6 @@
         (let [schema (if (satisfies? m/Schema schema-data)
                        schema-data
                        (malli.experimental.lite/schema schema-data))
-              coerced (dto/coerce query-params schema)]
+              coerced (coerce query-params schema)]
           (handler (assoc request :query-params coerced)))
         (handler request)))))
