@@ -20,7 +20,8 @@
          [:body {:style "display:flex; flex-direction:column; height:100%;"}
           content
           [:footer {:style "text-align:right; padding-botton: 20px"}
-           [:p (format "Build: %s (%s)" (@config :build :version) (@config :build :sha))]]]
+           [:p (format "Build: %s (%s)" (@config :build :version)
+                       (some-> (@config :build :git-sha) (subs 0 6)))]]]
          rst)])))
 
 (defn upload-page []
