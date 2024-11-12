@@ -21,7 +21,7 @@
           content
           [:footer {:style "text-align:right; padding-botton: 20px"}
            [:p (format "Build: %s (%s)" (@config :build :version)
-                       (some-> (@config :build :git-sha) (subs 0 6)))]]]
+                       (@config :build :git-sha))]]]
          rst)])))
 
 (defn upload-page []

@@ -49,6 +49,9 @@ services:
     build:
       context: /flamebin/qa/flamebin.dev/
       dockerfile: deploy/Dockerfile
+      args:
+        BUILD_VERSION: develop
+        GIT_SHA: ${GIT_SHA}
     networks:
       - shared
     expose:

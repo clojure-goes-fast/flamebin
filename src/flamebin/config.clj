@@ -24,15 +24,14 @@
 
    :build {:nested
            {:version {:type :string
-                      :default "unknown"
-                      :delayed-transform
-                      #(if (and (= % "unknown") (.exists (io/file "VERSION")))
-                         (slurp "VERSION") %)}
+                      :default #(or (and (.exists (io/file "VERSION"))
+                                         (-> (slurp "VERSION") str/trim not-empty))
+                                  "unknown")}
             :git-sha {:type :string
-                      :default "master"
-                      :delayed-transform
-                      #(if (and (= % "master") (.exists (io/file "GIT_SHA")))
-                         (slurp "GIT_SHA") %)}}}
+                      :default #(or (and (.exists (io/file "GIT_SHA"))
+                                         (some->> (slurp "GIT_SHA") str/trim not-empty
+                                                  (take 6) (apply str)))
+                                    "master")}}}
    :storage {:nested
              {:kind {:type :keyword
                      :default :disk}
