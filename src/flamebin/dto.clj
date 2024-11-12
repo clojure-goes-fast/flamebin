@@ -19,8 +19,10 @@ config ;; Don't remove.
 (def global-transformer
   (mt/transformer
    mt/string-transformer
+   (mt/key-transformer {:decode keyword})
    int-to-boolean
-   malli.experimental.time.transform/time-transformer))
+   malli.experimental.time.transform/time-transformer
+   mt/default-value-transformer))
 
 (defn coerce [value schema]
   (m/coerce schema value global-transformer))
@@ -54,7 +56,7 @@ config ;; Don't remove.
 ;;;; DenseProfile
 
 (defschema-and-constructor DenseProfile
-  (-> {:stacks [:vector [:tuple [:vector pos-int?] pos-int?]]
+  (-> {:stacks [:vector [:tuple [:vector nat-int?] pos-int?]]
        :id->frame [:vector string?]
        :total-samples pos-int?}
       mlite/schema
@@ -63,11 +65,11 @@ config ;; Don't remove.
 
 ;;;; UploadProfileRequest
 
-(defschema-and-constructor UploadProfileRequest
-  (-> {:profile-format [:enum :collapsed :dense-edn]
-       :kind [:enum :flamegraph :diffgraph]
+(defschema-and-constructor UploadProfileRequestParams
+  (-> {:format [:enum :collapsed :dense-edn]
+       :kind [:schema {:default :flamegraph} [:enum :flamegraph :diffgraph]]
        :type [:re #"[\w\.]+"]
-       :public? :boolean}
+       :public [:schema {:default false} :boolean]}
       mlite/schema))
 
-#_(->UploadProfileRequest "collapsed" "diffgraph" "cpu" true)
+#_(->UploadProfileRequestParams "collapsed" nil "cpu" true)

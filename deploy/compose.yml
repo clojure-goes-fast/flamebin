@@ -61,7 +61,6 @@ services:
       - ENV=qa
       - STORAGE__PATH=/storage
       - DB__PATH=/storage/db/main.db
-      - SERVER__HOST=qa.flamebin.dev
       - SERVER__PORT=80
       - REPL__ENABLED=true
       - REPL__PORT=9998
@@ -95,7 +94,6 @@ services:
       - ENV=prod
       - STORAGE__PATH=/storage
       - DB__PATH=/storage/db/main.db
-      - SERVER__HOST=flamebin.dev
       - SERVER__PORT=80
       - REPL__ENABLED=true
       - REPL__PORT=9999

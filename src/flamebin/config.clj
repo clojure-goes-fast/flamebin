@@ -49,11 +49,7 @@
    :server {:nested
             {:port {:type :number
                     :required true
-                    :default #(when (= (cfg/get :env) :local) 8086)}
-             :host {:type :string
-                    :required true
-                    :description "host where the server is deployed to"
-                    :default #(when (= (cfg/get :env) :local) (str "localhost:" (cfg/get :server :port)))}}}
+                    :default #(when (= (cfg/get :env) :local) 8086)}}}
 
    :limits {:nested
             {:gzip-max-expansion {:type :number
