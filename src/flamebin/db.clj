@@ -96,6 +96,13 @@ WHERE is_public = 1 ORDER BY upload_ts DESC LIMIT ?" n])
             (log/error msg)
             (raise 404 msg))))))
 
+(defn delete-profile [profile-id]
+  (with-locking db-lock
+    (let [q ["DELETE FROM profile WHERE id = ?" profile-id]
+          {::jdbc/keys [update-count]} (jdbc/execute-one! (db-options) q)]
+      (when (zero? update-count)
+        (raise 404 (format "Profile with ID '%s' not found." profile-id))))))
+
 (defn clear-db []
   (with-locking db-lock
     (.delete (clojure.java.io/file (@config :db :path)))

@@ -1,7 +1,7 @@
 (ns flamebin.web
   (:require [flamebin.config :refer [config]]
             [flamebin.core :as core]
-            [flamebin.dto :refer [->UploadProfileRequest]]
+            [flamebin.dto :refer [UploadProfileRequestParams]]
             [flamebin.infra.metrics :as ms]
             [flamebin.rate-limiter :as rl]
             [flamebin.util :refer [raise valid-id?]]
@@ -20,84 +20,9 @@
             [reitit.ring.middleware.parameters :refer [parameters-middleware]]
             [ring.middleware.head]
             [ring.middleware.resource]
-            [taoensso.timbre :as log])
+            [taoensso.timbre :as log]
+            [flamebin.web.middleware :refer :all])
   (:import clojure.lang.ExceptionInfo))
-
-;; Middleware
-
-(defn resp
-  ([body] (resp 200 body))
-  ([status body] {:status status, :body body}))
-
-(def ^:private content-middleware-config
-  (content/create
-   (update content/default-options :formats select-keys ["application/json"])))
-
-(defn- ensure-content-length [request]
-  (or (get-in request [:headers "content-length"])
-      (raise 411 "Content-Length header is required.")))
-
-(defn wrap-parse-content-length [handler]
-  (fn [request]
-    (if-let [length (some-> (get-in request [:headers "content-length"])
-                            parse-long)]
-      (do (ms/mark "app.http.content_length_bytes" {} length)
-          (handler (assoc-in request [:headers "content-length"] length)))
-      (handler request))))
-
-(defn wrap-gzip-request [handler]
-  (fn [request]
-    (if (= (get-in request [:headers "content-encoding"]) "gzip")
-      (let [length (ensure-content-length request)
-            stream (streams/safe-gzip-input-stream (:body request) length)
-            response (handler (assoc request :gzipped? true, :body stream))
-            read (streams/get-byte-count stream)]
-        (ms/mark "app.http.gzip_expanded_bytes" {} (double read))
-        response)
-      (handler request))))
-
-(defn wrap-ignore-form-params [handler]
-  (fn [request]
-    ;; Hack for wrap-params to ignore :body and not parse it to get form-params.
-    (handler (update request :form-params #(or % {})))))
-
-(defn wrap-exceptions [handler]
-  (letfn [(ISE [ex]
-            (log/error ex "Unhandled error while processing request.")
-            (resp 500 "Internal server error."))]
-    (fn [request]
-      (try (handler request)
-           (catch ExceptionInfo ex
-             (let [{:keys [http-code type data]} (ex-data ex)]
-               (cond http-code (resp http-code (ex-message ex))
-
-                     (= type ::m/coercion)
-                     (do (log/warn "Malli error" data)
-                         (resp 400 (str "Validation error: "
-                                        (malli.error/humanize (:explain data)))))
-
-                     :else (ISE ex))))
-           (catch Exception ex (ISE ex))))))
-
-(defn wrap-measure-response-time [handler]
-  (fn [request]
-    (let [sw (ms/stopwatch)
-          {:keys [status] :as response} (handler request)
-          path (or (:template (::r/match request)) "unknown")]
-      (sw "app.http.response_time" {:path path, :code (or status 200)})
-      response)))
-
-(defn wrap-restore-remote-addr
-  "Restore the correct :remote-addr from Cloudflare headers if present."
-  [handler]
-  (fn [request]
-    (let [{:strs [cf-connecting-ip]} (:headers request)]
-      (handler (update request :remote-addr #(or cf-connecting-ip %))))))
-
-(defn wrap-log-request [handler]
-  (fn [{:keys [remote-addr request-method uri] :as request}]
-    (log/infof "HTTP [%s] %s %s" remote-addr request-method uri)
-    (handler request)))
 
 ;; Endpoints: API
 
@@ -106,30 +31,36 @@
                  (@rl/global-processed-kbytes-limiter length-kb))
     (raise 429 "Upload processed bytes limit reached.")))
 
-(defn- profile-url [router profile-id read-token]
-  (format "https://%s%s%s"
-          (@config :server :host)
+(defn- profile-url [{:keys [scheme headers ::r/router]} profile-id read-token]
+  (format "%s://%s%s" (name scheme) (get headers "host")
           (-> (r/match-by-name router ::profile-page {:profile-id profile-id})
-              r/match->path)
-          (if read-token
-            (str "?read-token=" read-token)
-            "")))
+              (r/match->path (when read-token
+                               {:read-token read-token})))))
+(defn- deletion-url [{:keys [scheme headers ::r/router]} profile-id edit-token]
+  (format "%s://%s%s" (name scheme) (get headers "host")
+          (-> (r/match-by-name router ::api-delete-profile)
+              (r/match->path {:id profile-id :edit-token edit-token}))))
 
-(defn $upload-profile [{:keys [remote-addr body query-params], router ::r/router
-                        :as req}]
+#_(deletion-url {:scheme :https, :headers {"host" "localhost:8086"},
+                 ::r/router (::r/router (meta app))} "abcdef" "123")
+
+(defn $upload-profile [{:keys [remote-addr body query-params] :as req}]
   (let [length-kb (quot (ensure-content-length req) 1024)]
     (ensure-processed-limits remote-addr length-kb)
-    ;; TODO: probably better validate in routes coercion.
-    (let [{:strs [kind type public], pformat "format"} query-params
-          req' (->UploadProfileRequest pformat (or kind :flamegraph) type
-                                       (= public "true"))
-
-          {:keys [id read-token] :as profile} (core/save-profile body remote-addr req')]
+    (let [{:keys [id read-token edit_token] :as profile}
+          (core/save-profile body remote-addr query-params)]
       {:status 201
-       :headers (cond-> {"Location" (profile-url router id read-token)
+       :headers (cond-> {"Location" (profile-url req id read-token)
                          "X-Created-ID" (str id)}
-                    read-token (assoc "X-Read-Token" read-token))
+                  read-token (assoc "X-Read-Token" read-token)
+                  edit_token (assoc "X-Edit-Token" edit_token)
+                  edit_token (assoc "X-Deletion-Link" (deletion-url req id edit_token)))
        :body profile})))
+
+(defn $delete-profile [{:keys [remote-addr query-params] :as req}]
+  (let [{:keys [id edit-token]} query-params]
+    (core/delete-profile id edit-token)
+    (resp 200 {:message (str "Successfully deleted profile: " id)})))
 
 ;; Endpoints: web pages
 
@@ -140,13 +71,13 @@
   (resp (pages/index-page)))
 
 (defn $render-profile [{:keys [path-params query-params] :as req}]
-  ;; TODO: define read_token in routes.
-  (let [{:keys [profile-id]} path-params]
+  (let [{:keys [profile-id]} path-params
+        {:keys [read-token]} query-params]
     (when-not (valid-id? profile-id)
       (raise 404 (str "Invalid profile ID: " profile-id)))
     {:status 200
      :headers {"content-type" "text/html"}
-     :body (core/render-profile profile-id (query-params "read-token"))}))
+     :body (core/render-profile profile-id read-token)}))
 
 (defn $public-resource [req]
   (ring.middleware.resource/resource-request req ""))
@@ -161,8 +92,7 @@
                       [wrap-log-request]
                       [wrap-parse-content-length]
                       [content.mw/wrap-format content-middleware-config]
-                      [wrap-ignore-form-params]
-                      [parameters-middleware]
+                      [wrap-really-coerce-query-params]
                       ;; ↑↑↑ RESPONSE ↑↑↑
                       ]}
      ;; HTML
@@ -173,23 +103,34 @@
       ["/:profile-id" {:name ::profile-page
                        :get {:handler #'$render-profile
                              :coercion reitit.coercion.malli/coercion
-                             :parameters {:path {:profile-id string?}}}}]]
+                             :parameters {:path {:profile-id :nano-id}
+                                          :query' {:read-token :string}}}}]]
 
      ;; API
      ["/api/v1" {}
-      ["/upload-profile" {:middleware [[wrap-gzip-request]]
-                          :post {:handler #'$upload-profile}}]
+      ["/upload-profile" {:middleware [wrap-gzip-request]
+                          :post {:handler #'$upload-profile
+                                 :parameters {:query' UploadProfileRequestParams}}}]
+      ;; GET so that user can easily do it in the browser.
+      ["/delete-profile" {:name ::api-delete-profile
+                          :get {:handler #'$delete-profile
+                                :parameters {:query' {:id :nano-id
+                                                      :edit-token :string}}}}]
       #_["/profiles" {:get {:handler #'$list-profiles}}]]
 
      ;; Infra
      ["/infra" {}
       ["/health" {:get {:handler (fn [_] (resp (str (java.util.Date.))))}}]]]
-    {:data {:middleware [;; Needed for coercion to work.
+    {:data {:middleware [parameters-middleware
+                         ;; Needed for coercion to work.
                          ring-coercion/coerce-exceptions-middleware
+                         ;; Deliberately putting wrap-exceptions twice to catch
+                         ;; coercion requests too.
+                         wrap-exceptions
                          ring-coercion/coerce-request-middleware]}})
    (ring/redirect-trailing-slash-handler)
    ;; This middleware should live outside of router because it impacts matching.
-   {:middleware [[ring.middleware.head/wrap-head]]}))
+   {:middleware [ring.middleware.head/wrap-head]}))
 
 (mount/defstate server
   :start (let [port (@config :server :port)]

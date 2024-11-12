@@ -40,7 +40,7 @@
 (def nano-id-registry
   {:nano-id [:and {:gen/gen (gen-invoke new-id)}
              :string
-             [:fn valid-id?]]})
+             [:fn {:error/message "Not valid ID"} valid-id?]]})
 
 (let [generator (encore/rand-id-fn {:chars :alphanumeric, :len secret-token-bytes})]
   (defn secret-token [] (generator)))

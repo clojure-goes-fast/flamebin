@@ -13,13 +13,12 @@
                  (@rl/global-saved-kbytes-limiter length-kb))
     (raise 429 "Upload saved bytes limit reached.")))
 
-(defn save-profile [stream ip {:keys [profile-format type public?]
-                               :as _upload-request}]
-  (let [profile (case profile-format
+(defn save-profile [stream ip {:keys [public] :as params}]
+  (let [profile (case (:format params)
                   :collapsed (proc/collapsed-stacks-stream->dense-profile stream)
                   :dense-edn (proc/dense-edn-stream->dense-profile stream))
         edit-token (secret-token)
-        read-token (when-not public? (secret-token))
+        read-token (when-not public (secret-token))
         dpf-array (proc/freeze profile read-token)
         dpf-kb (quot (alength ^bytes dpf-array) 1024)
         id (db/new-unused-id)
@@ -27,8 +26,8 @@
     (ensure-saved-limits ip dpf-kb)
     (storage/save-file dpf-array filename)
     ;; TODO: replace IP with proper owner at some point
-    (-> (dto/->Profile id filename type (:total-samples profile) ip
-                       edit-token public? (Instant/now))
+    (-> (dto/->Profile id filename (:type params) (:total-samples profile) ip
+                       edit-token public (Instant/now))
         db/insert-profile
         ;; Attach read-token to the response here — it's not in the scheme
         ;; because we don't store it in the DB.
@@ -45,10 +44,19 @@
         (proc/read-compressed-profile read-token)
         (render/render-html-flamegraph {}))))
 
+(defn delete-profile [profile-id provided-edit-token]
+  (let [{:keys [edit_token file_path]} (db/get-profile profile-id)]
+    ;; Authorization
+    (when (and edit_token (not= provided-edit-token edit_token))
+      (raise 403 "Required edit-token to perform this action."))
+    (println file_path)
+    (storage/delete-file file_path)
+    (db/delete-profile profile-id)))
+
 (defn list-public-profiles []
   (db/list-public-profiles 20))
 
 (comment
   (save-profile
    (clojure.java.io/input-stream (clojure.java.io/file "test/res/normal.txt"))
-   "me" (dto/->UploadProfileRequest :collapsed :flamegraph "alloc" false)))
+   "me" (dto/->UploadProfileRequestParams :lcollapsed :flamegraph "alloc" false)))
