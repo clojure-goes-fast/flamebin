@@ -94,8 +94,8 @@
   (fn [request]
     (let [method (:request-method request)
           [schema-data] (some-> request ring/get-match :data (get method) :parameters :query')
-          query-params (not-empty (:query-params request))]
-      (if (and schema-data query-params)
+          query-params (:query-params request)]
+      (if schema-data
         ;; TODO: prevent interning attack?
         (let [schema (if (satisfies? m/Schema schema-data)
                        schema-data
