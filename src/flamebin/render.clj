@@ -15,6 +15,7 @@
                       :isDiffgraph    false
                       :userTransforms ""
                       :idToFrame      idToFrame
+                      :config         "null"
                       :stacks         data}))]
     (-> (slurp (io/resource "flamegraph-rendering/template.html"))
         (cljap.render/render-template {:script full-js}))))
