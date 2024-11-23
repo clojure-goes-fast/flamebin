@@ -2,6 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [mount.lite :as mount]
+            [mount.extensions.autostart :as mount.auto]
             [omniconf.core :as cfg]
             [taoensso.timbre :as log]
             [taoensso.timbre.tools.logging]))
@@ -79,13 +80,14 @@
            :port {:type :number
                   :required #(cfg/get :repl :enabled)}}}})
 
+(def ^:dynamic *silent* false)
+
 (defn init-config []
   (cfg/populate-from-env)
-  (cfg/verify))
+  (cfg/verify :silent *silent*))
 
 (mount/defstate config
-  :start (do (init-config) (fn config-getter [& path] (apply cfg/get path))))
-
+  :start (do (init-config) cfg/get))
 #_(mount/start #'config)
 
 ;;;; Misc initialization
