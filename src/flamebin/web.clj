@@ -93,13 +93,14 @@
      ;; HTML
      ["" {}
       ["/" {:get {:handler #'$page-list-profiles}}]
-      ["/public/*path" {:get {:handler #'$public-resource}}]
-      ["/profiles/upload" {:get {:handler #'$page-upload-file}}]
       ["/:profile-id" {:name ::profile-page
                        :get {:handler #'$render-profile
                              :coercion reitit.coercion.malli/coercion
                              :parameters {:path {:profile-id :nano-id}
-                                          :query' {:read-token :string}}}}]]
+                                          :query' [:map
+                                                   [:read-token {:optional true} :string]]}}}]
+      ["/profiles/upload" {:get {:handler #'$page-upload-file}}]
+      ["/public/*path" {:get {:handler #'$public-resource}}]]
 
      ;; API
      ["/api/v1" {}
@@ -111,11 +112,7 @@
                           :get {:handler #'$delete-profile
                                 :parameters {:query' {:id :nano-id
                                                       :edit-token :string}}}}]
-      #_["/profiles" {:get {:handler #'$list-profiles}}]]
-
-     ;; Infra
-     ["/infra" {}
-      ["/health" {:get {:handler (fn [_] (resp (str (java.util.Date.))))}}]]]
+      #_["/profiles" {:get {:handler #'$list-profiles}}]]]
     {:data {:middleware [parameters-middleware
                          ;; Needed for coercion to work.
                          ring-coercion/coerce-exceptions-middleware
