@@ -13,7 +13,7 @@
             [taoensso.timbre :as timbre]))
 
 (defmacro with-temp-db-and-state [& body]
-  `(try (with-temp-db
+  `(try (with-temp [:storage :db]
           (doto #'db/db mount/stop mount/start)
           ~@body)
         (finally (doto #'db/db mount/stop mount/start))))
