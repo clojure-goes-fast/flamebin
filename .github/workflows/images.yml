@@ -17,8 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - uses: actions/setup-java@v4
         with:
@@ -38,6 +36,9 @@ jobs:
             ~/.deps.clj
           key: cljdeps-${{ hashFiles('deps.edn') }}
           restore-keys: cljdeps-
+
+      - name: Unzip test resources
+        run: cd test/res && gunzip *.gz
 
       - name: Run tests
         run: clojure -X:test
