@@ -16,7 +16,7 @@
         io.micrometer/micrometer-registry-prometheus {:mvn/version "1.13.6"}
         io.micrometer/micrometer-core {:mvn/version "1.13.6"}
         ;; Util
-        com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.4.0"}
+        com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.5.1"}
         com.grammarly/omniconf {:mvn/version "0.5.2"}
         com.taoensso/nippy {:mvn/version "3.4.2"}
         functionalbytes/mount-lite {:mvn/version "2.3.1"}

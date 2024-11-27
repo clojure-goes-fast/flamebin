@@ -9,7 +9,7 @@
         idToFrame (#'cljap.render/print-id-to-frame id->frame)
         data (#'cljap.render/print-add-stacks stacks false)
         user-transforms nil
-        full-js (-> (slurp (io/resource "flamegraph-rendering/script.js"))
+        full-js (-> (slurp (io/resource "flamegraph/script.js"))
                     (cljap.render/render-template
                      {:graphTitle     (pr-str (or (:title options) ""))
                       :isDiffgraph    false
@@ -17,5 +17,5 @@
                       :idToFrame      idToFrame
                       :config         "null"
                       :stacks         data}))]
-    (-> (slurp (io/resource "flamegraph-rendering/template.html"))
+    (-> (slurp (io/resource "flamegraph/template.html"))
         (cljap.render/render-template {:script full-js}))))
