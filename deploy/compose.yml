@@ -47,7 +47,7 @@ services:
   flamebin-qa:
     container_name: flamebin-qa
     build:
-      context: /flamebin/qa/flamebin.dev/
+      context: /flamebin/qa/repo/
       dockerfile: deploy/Dockerfile
       args:
         BUILD_VERSION: develop
