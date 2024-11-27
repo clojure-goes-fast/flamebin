@@ -82,7 +82,7 @@ services:
 
   flamebin-prod:
     container_name: flamebin-prod
-    image: ghcr.io/clojure-goes-fast/flamebin:2024.18
+    image: ghcr.io/clojure-goes-fast/flamebin:2024.32
     networks:
       - shared
     expose:
