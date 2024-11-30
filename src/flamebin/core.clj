@@ -5,7 +5,8 @@
             [flamebin.rate-limiter :as rl]
             [flamebin.render :as render]
             [flamebin.storage :as storage]
-            [flamebin.util :refer [raise secret-token new-id]])
+            [flamebin.util :refer [raise secret-token new-id]]
+            [taoensso.timbre :as log])
   (:import java.time.Instant))
 
 (defn- ensure-saved-limits [ip length-kb]
@@ -27,7 +28,7 @@
     (storage/save-file dpf-array filename)
     ;; TODO: replace IP with proper owner at some point
     (-> (dto/->Profile id filename (:type params) (:total-samples profile) ip
-                       edit-token public (Instant/now))
+                       edit-token public nil (Instant/now))
         db/insert-profile
         ;; Attach read-token to the response here — it's not in the scheme
         ;; because we don't store it in the DB.
@@ -42,16 +43,26 @@
 
     (-> (storage/get-file file_path)
         (proc/read-compressed-profile read-token)
-        (render/render-html-flamegraph {}))))
+        (render/render-html-flamegraph profile {}))))
+
+(defn- authorize-profile-editing [profile provided-edit-token]
+  (let [{:keys [edit_token]} profile]
+    (when (and edit_token (not= provided-edit-token edit_token))
+      (raise 403 "Required edit-token to perform this action."))))
 
 (defn delete-profile [profile-id provided-edit-token]
-  (let [{:keys [edit_token file_path]} (db/get-profile profile-id)]
-    ;; Authorization
-    (when (and edit_token (not= provided-edit-token edit_token))
-      (raise 403 "Required edit-token to perform this action."))
-    (println file_path)
+  (let [{:keys [file_path] :as profile} (db/get-profile profile-id)]
+    (authorize-profile-editing profile provided-edit-token)
     (storage/delete-file file_path)
     (db/delete-profile profile-id)))
+
+(defn save-profile-config [profile-id config-string provided-edit-token]
+  (let [{:keys [file_path] :as profile} (db/get-profile profile-id)]
+    (authorize-profile-editing profile provided-edit-token)
+    (when (> (count config-string) 2000)
+      (raise 413 "Config string is too long."))
+    (log/infof "Setting config for profile %s: %s" profile-id config-string)
+    (db/save-profile-config profile-id config-string)))
 
 (defn list-public-profiles []
   (db/list-public-profiles 20))

@@ -10,6 +10,7 @@ const qString = new URLSearchParams(window.location.search)
 const transformFilterTemplate = document.getElementById('transformFilterTemplate');
 const transformReplaceTemplate = document.getElementById('transformReplaceTemplate');
 const minSamplesToShow = 0; // Don't hide any frames for now.
+const profileId = "<<<profileId>>>";
 
 /// Config handling
 
@@ -223,12 +224,16 @@ async function pasteConfigFromClipboard() {
 }
 
 async function saveConfigToServer() {
-  let packedConfig = await constructPackedConfig();
-  let req = new XMLHttpRequest();
-  req.open("POST", "/save-config?packed-config=" + packedConfig);
-  console.log("[clj-async-profiler] Sending save-config request to backend:", req);
-  req.send();
-  showToast("Config saved to server.")
+  let editToken = window.prompt("Paste editToken here to save the profile config", "");
+  if (editToken != null && editToken != "") {
+    let packedConfig = await constructPackedConfig();
+    let req = new XMLHttpRequest();
+    req.open("POST", `/api/v1/save-profile-config?id=${profileId}&edit-token=${editToken}&config=${packedConfig}`);
+    console.log("[clj-async-profiler] Sending save-config request to backend:", req);
+    req.send();
+    if (req.status == 204)
+      showToast("Config saved to server.")
+  }
 }
 
 function match(string, obj) {

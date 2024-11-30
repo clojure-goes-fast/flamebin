@@ -57,6 +57,11 @@
     (core/delete-profile id edit-token)
     (resp 200 {:message (str "Successfully deleted profile: " id)})))
 
+(defn $save-config [{:keys [query-params]}]
+  (let [{:keys [id edit-token config]} query-params]
+    (core/save-profile-config id config edit-token)
+    (resp 204 nil)))
+
 ;; Endpoints: web pages
 
 (defn $page-upload-file [req]
@@ -107,6 +112,10 @@
       ["/upload-profile" {:middleware [wrap-gzip-request]
                           :post {:handler #'$upload-profile
                                  :parameters {:query' UploadProfileRequestParams}}}]
+      ["/save-profile-config" {:post {:handler #'$save-config
+                                      :parameters {:query' {:id :nano-id
+                                                            :edit-token :string
+                                                            :config :string}}}}]
       ;; GET so that user can easily do it in the browser.
       ["/delete-profile" {:name ::api-delete-profile
                           :get {:handler #'$delete-profile

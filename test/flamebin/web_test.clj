@@ -144,9 +144,47 @@
                                                          serialized-edn)
                                  gzip? gzip-content)})]
           (is (match? {:status 201} (dissoc resp :opts)))
-          (is (match? {:status 200} (req :nil :get (str "/" (:id (:body resp)))))))))
+          (is (match? {:status 200} (req nil :get (str "/" (:id (:body resp)))))))))
 
     (testing "big files are rejected by the webserver"
       (is (match? {:error any?}
                   (req :api :post "/api/v1/upload-profile?format=collapsed&type=cpu&public=true"
                         {:body (io/file "test/res/huge.txt")}))))))
+
+(deftest save-profile-config-test
+  (with-temp :all
+    (let [resp (req :api :post "/api/v1/upload-profile?format=collapsed&type=cpu&public=true"
+                    {:body (io/file "test/res/small.txt")})
+          {:keys [id edit_token]} (:body resp)]
+      (let [conf "H4sIAAAAAAAAE6tWyshMz8jJTM8oUbJSSjJX0lEqKUrMK07LL8otVrKKjq0FALrNy6siAAAA"
+            resp (req :api :post (format "/api/v1/save-profile-config?id=%s&edit-token=%s&config=%s"
+                                         id "bad-token" conf))]
+        (testing "requires edit-token"
+          (is (match? {:status 403}
+                      (req :api :post (format "/api/v1/save-profile-config?id=%s&edit-token=%s&config=%s"
+                                              id "bad-token" conf)))))
+        (testing "rejects big config"
+          (is (match? {:status 413}
+                      (req :api :post (format "/api/v1/save-profile-config?id=%s&edit-token=%s&config=%s"
+                                              id edit_token (apply str (repeat 2001 \a)))))))
+
+        (let [conf1 "H4sIAAAAAAAAE6tWyshMz8jJTM8oUbJSykjNyclX0lEqzi8q0U2qVLJSykvMTVXSUSopSswrTssvyi1WsoqOrQUA1WAM1jYAAAA="]
+          (testing "accepts valid config"
+            (is (match? {:status 204}
+                        (req nil :post (format "/api/v1/save-profile-config?id=%s&edit-token=%s&config=%s"
+                                               id edit_token conf1))))
+
+            (testing "which is then getting baked into flamegraph"
+              (is (match? {:status 200
+                           :body (re-pattern (format "\nconst bakedPackedConfig = \"%s\"" conf1))}
+                          (req nil :get (format "/%s" id)))))))
+
+        (let [conf2 "H4sIAAAAAAAAE6tWKkotSy0qTlWyKikqTdVRKilKzCtOyy_KLVayio6tBQBhhHuhIAAAAA=="]
+          (testing "swap to another config"
+            (is (match? {:status 204}
+                        (req nil :post (format "/api/v1/save-profile-config?id=%s&edit-token=%s&config=%s"
+                                               id edit_token conf2))))
+
+            (is (match? {:status 200
+                         :body (re-pattern (format "\nconst bakedPackedConfig = \"%s\"" conf2))}
+                        (req nil :get (format "/%s" id))))))))))

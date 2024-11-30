@@ -31,7 +31,7 @@
                 :lock (ReentrantLock.)}
            migrate))
 
-#_(mount/start #'db)
+#_(do (mount/stop #'db) (mount/start #'db))
 
 ;;;; DB interaction
 
@@ -51,7 +51,7 @@
 (defn insert-profile [profile]
   (m/assert Profile profile)
   (let [{:keys [id file_path profile_type sample_count owner upload_ts
-                edit_token is_public]} profile]
+                edit_token config is_public]} profile]
     (log/infof "Inserting profile %s from %s" id owner)
     (with-locking (:lock @db)
       (jdbc/with-transaction [tx @db]
@@ -63,6 +63,7 @@
                               :sample_count  sample_count
                               :is_public     is_public
                               :edit_token    edit_token
+                              :config        config
                               :owner         owner})
         (jdbc/execute-one! tx ["UPDATE stats SET val = val + 1 WHERE stat = 'total_uploaded'"])))
     profile))
@@ -73,21 +74,21 @@
 
 (defn list-profiles []
   (with-locking (:lock @db)
-    (->> (jdbc/execute! @db ["SELECT id, file_path, profile_type, sample_count, owner, upload_ts, is_public FROM profile"])
+    (->> (jdbc/execute! @db ["SELECT id, file_path, profile_type, sample_count, owner, config, upload_ts, is_public FROM profile"])
          (mapv #(-> (unqualify-keys %)
                     (assoc :edit_token nil)
                     (coerce Profile))))))
 
 (defn list-public-profiles [n]
   (with-locking (:lock @db)
-    (->> (jdbc/execute! @db ["SELECT id, file_path, profile_type, sample_count, owner, upload_ts, is_public, edit_token FROM profile
+    (->> (jdbc/execute! @db ["SELECT id, file_path, profile_type, sample_count, owner, config, upload_ts, is_public, edit_token FROM profile
 WHERE is_public = 1 ORDER BY upload_ts DESC LIMIT ?" n])
          (mapv #(-> (unqualify-keys %)
                     (coerce Profile))))))
 
 (defn get-profile [profile-id]
   (with-locking (:lock @db)
-    (let [q ["SELECT id, file_path, profile_type, sample_count, owner, upload_ts, edit_token, is_public FROM profile WHERE id = ?" profile-id]
+    (let [q ["SELECT id, file_path, profile_type, sample_count, owner, config, upload_ts, edit_token, is_public FROM profile WHERE id = ?" profile-id]
           row (some-> (jdbc/execute-one! @db q)
                       unqualify-keys
                       (coerce Profile))]
@@ -102,6 +103,10 @@ WHERE is_public = 1 ORDER BY upload_ts DESC LIMIT ?" n])
           {::jdbc/keys [update-count]} (jdbc/execute-one! @db q)]
       (when (zero? update-count)
         (raise 404 (format "Profile with ID '%s' not found." profile-id))))))
+
+(defn save-profile-config [profile-id config]
+  (with-locking (:lock @db)
+    (sql-helpers/update! @db :profile {:config config} {:id profile-id})))
 
 (defn clear-db []
   (with-locking (:lock @db)
