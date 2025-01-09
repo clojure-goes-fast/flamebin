@@ -43,8 +43,8 @@
        :stacks [:or
                 [:vector [:tuple [:vector nat-int?] pos-int?]]
                 [:vector [:tuple [:vector nat-int?] [:map
-                                                     [:samples-a pos-int?]
-                                                     [:samples-b pos-int?]]]]]
+                                                     [:samples-a nat-int?]
+                                                     [:samples-b nat-int?]]]]]
        :id->frame [:vector string?]
        :total-samples pos-int?)
       mlite/schema
