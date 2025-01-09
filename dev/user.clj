@@ -9,5 +9,4 @@
                   (clojure.lang.Compiler/load (clojure.java.io/reader %))))))
 
 (defn dev []
-  (require 'flamebin.main)
-  (flamebin.main/-main))
+  ((requiring-resolve 'flamebin.main/-main)))
