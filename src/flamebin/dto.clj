@@ -40,7 +40,11 @@
 
 (defschema-and-constructor DenseProfile
   (-> (array-map
-       :stacks [:vector [:tuple [:vector nat-int?] pos-int?]]
+       :stacks [:or
+                [:vector [:tuple [:vector nat-int?] pos-int?]]
+                [:vector [:tuple [:vector nat-int?] [:map
+                                                     [:samples-a pos-int?]
+                                                     [:samples-b pos-int?]]]]]
        :id->frame [:vector string?]
        :total-samples pos-int?)
       mlite/schema

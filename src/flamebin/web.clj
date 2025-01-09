@@ -42,6 +42,9 @@
 (defn $upload-profile [{:keys [remote-addr body query-params] :as req}]
   (let [length-kb (quot (ensure-content-length req) 1024)]
     (ensure-processed-limits remote-addr length-kb)
+    (when (and (= (:kind query-params) :diffgraph)
+               (= (:format query-params) :collapsed))
+      (raise 422 "Diffgraphs can only be uploaded in dense-edn format."))
     (let [{:keys [id read-token edit_token] :as profile}
           (core/save-profile body remote-addr query-params)]
       {:status 201

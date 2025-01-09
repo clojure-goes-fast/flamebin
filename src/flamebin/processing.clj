@@ -109,13 +109,19 @@
       collapsed-stacks-stream->intermediate-profile
       intermediate-profile->dense-profile))
 
+(defn- count-total-samples [dense-profile]
+  (transduce (if (number? (first (:stacks dense-profile)))
+               (map second) ;; Flamegraph
+               (map (fn [[_ v]](+ (:samples-a v) (:samples-b v))))) ;; Diffgraph
+             + 0 (:stacks dense-profile)))
+
 (defn dense-edn-stream->dense-profile [^InputStream input-stream]
   (with-open [rdr (PushbackReader. (io/reader input-stream))]
     (let [profile (select-keys (edn/read rdr) [:stacks :id->frame :total-samples])]
       (m/assert DenseProfile profile)
       ;; Calculate total samples if not provided.
       (update profile :total-samples
-              #(or % (transduce (map second) + 0 (:stacks profile)))))))
+              #(or % (count-total-samples profile))))))
 
 (defn read-compressed-profile [source-file read-token]
   (try (nippy/thaw-from-file source-file {:password (when read-token

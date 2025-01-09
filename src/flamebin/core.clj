@@ -14,7 +14,7 @@
                  (@rl/global-saved-kbytes-limiter length-kb))
     (raise 429 "Upload saved bytes limit reached.")))
 
-(defn save-profile [stream ip {:keys [public] :as params}]
+(defn save-profile [stream ip {:keys [public kind] :as params}]
   (let [profile (case (:format params)
                   :collapsed (proc/collapsed-stacks-stream->dense-profile stream)
                   :dense-edn (proc/dense-edn-stream->dense-profile stream))
@@ -27,7 +27,7 @@
     (ensure-saved-limits ip dpf-kb)
     (storage/save-file dpf-array filename)
     ;; TODO: replace IP with proper owner at some point
-    (-> (dto/->Profile id filename (:type params) (:total-samples profile) ip
+    (-> (dto/->Profile id filename (:type params) kind (:total-samples profile) ip
                        edit-token public nil (Instant/now))
         db/insert-profile
         ;; Attach read-token to the response here — it's not in the scheme

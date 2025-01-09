@@ -6,18 +6,19 @@
 
 (defn render-html-flamegraph [dense-profile profile-dto options]
   (let [{:keys [stacks id->frame]} dense-profile
-        {:keys [config]} profile-dto
+        {:keys [config kind]} profile-dto
         config (if config
                  (str "\"" config "\"")
                  "null")
         idToFrame (#'cljap.render/print-id-to-frame id->frame)
-        data (#'cljap.render/print-add-stacks stacks false)
+        diffgraph? (= kind :diffgraph)
+        data (#'cljap.render/print-add-stacks stacks diffgraph?)
         user-transforms nil
         full-js (-> (slurp (io/resource "flamegraph/script.js"))
                     (cljap.render/render-template
                      {:graphTitle     (pr-str (or (:title options) ""))
                       :profileId      (:id profile-dto)
-                      :isDiffgraph    false
+                      :isDiffgraph    (str diffgraph?)
                       :userTransforms ""
                       :idToFrame      idToFrame
                       :config         config
