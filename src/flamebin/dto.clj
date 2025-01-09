@@ -23,6 +23,7 @@
        :id :nano-id
        :file_path [:and {:gen/fmap #(str % ".dpf")} :string]
        :profile_type :keyword
+       :kind [:enum :flamegraph :diffgraph]
        :sample_count [:maybe nat-int?]
        :owner [:maybe :string]
        :edit_token [:maybe :string]

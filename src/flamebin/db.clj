@@ -50,7 +50,7 @@
 
 (defn insert-profile [profile]
   (m/assert Profile profile)
-  (let [{:keys [id file_path profile_type sample_count owner upload_ts
+  (let [{:keys [id file_path profile_type kind sample_count owner upload_ts
                 edit_token config is_public]} profile]
     (log/infof "Inserting profile %s from %s" id owner)
     (with-locking (:lock @db)
@@ -59,6 +59,7 @@
                              {:id            id
                               :file_path     file_path
                               :profile_type  (name profile_type)
+                              :kind          (name kind)
                               :upload_ts     (str upload_ts)
                               :sample_count  sample_count
                               :is_public     is_public
@@ -74,21 +75,21 @@
 
 (defn list-profiles []
   (with-locking (:lock @db)
-    (->> (jdbc/execute! @db ["SELECT id, file_path, profile_type, sample_count, owner, config, upload_ts, is_public FROM profile"])
+    (->> (jdbc/execute! @db ["SELECT id, file_path, profile_type, kind, sample_count, owner, config, upload_ts, is_public FROM profile"])
          (mapv #(-> (unqualify-keys %)
                     (assoc :edit_token nil)
                     (coerce Profile))))))
 
 (defn list-public-profiles [n]
   (with-locking (:lock @db)
-    (->> (jdbc/execute! @db ["SELECT id, file_path, profile_type, sample_count, owner, config, upload_ts, is_public, edit_token FROM profile
+    (->> (jdbc/execute! @db ["SELECT id, file_path, profile_type, kind, sample_count, owner, config, upload_ts, is_public, edit_token FROM profile
 WHERE is_public = 1 ORDER BY upload_ts DESC LIMIT ?" n])
          (mapv #(-> (unqualify-keys %)
                     (coerce Profile))))))
 
 (defn get-profile [profile-id]
   (with-locking (:lock @db)
-    (let [q ["SELECT id, file_path, profile_type, sample_count, owner, config, upload_ts, edit_token, is_public FROM profile WHERE id = ?" profile-id]
+    (let [q ["SELECT id, file_path, profile_type, kind, sample_count, owner, config, upload_ts, edit_token, is_public FROM profile WHERE id = ?" profile-id]
           row (some-> (jdbc/execute-one! @db q)
                       unqualify-keys
                       (coerce Profile))]

@@ -26,19 +26,19 @@
 
 (deftest manual-test
   (with-temp-db-and-state
-    (db/insert-profile (dto/->Profile "QcXAqv" "some-path.dpf" "cpu" 12345
+    (db/insert-profile (dto/->Profile "QcXAqv" "some-path.dpf" "cpu" :flamegraph 12345
                                       nil "alhdslfglksjdfhg" true "HAA" inst1))
     (is (= {:id "QcXAqv", :file_path "some-path.dpf", :profile_type :cpu,
             :upload_ts inst1, :sample_count 12345, :owner nil, :is_public true
-            :config "HAA", :edit_token "alhdslfglksjdfhg"}
+            :config "HAA", :edit_token "alhdslfglksjdfhg", :kind :flamegraph}
            (db/get-profile "QcXAqv")))
     (is (inst? (:upload_ts (db/get-profile "QcXAqv"))))
 
-    (db/insert-profile (dto/->Profile "tX8nuc" "another-path.dpf" "alloc" 54321
-                                      "me" nil false nil inst1))
+    (db/insert-profile (dto/->Profile "tX8nuc" "another-path.dpf" "alloc"
+                                      :diffgraph 54321 "me" nil false nil inst1))
     (is (= {:id "tX8nuc", :file_path "another-path.dpf", :edit_token nil
             :owner "me", :sample_count 54321, :profile_type :alloc, :is_public false
-            :config nil, :upload_ts inst1}
+            :config nil, :upload_ts inst1, :kind :diffgraph}
            (db/get-profile "tX8nuc")))))
 
 ;;;; Generative testing
