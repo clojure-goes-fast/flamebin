@@ -59,15 +59,15 @@
                        :rps    (number 200 #_=200KB/s)}}
 
              :per-ip-processed-kbytes
-             {:nested {:buffer (number 1024 #_=1MB)
+             {:nested {:buffer (number 2048 #_=1MB)
                        :rps    (number 50 #_=50KB/s)}}
 
              :global-saved-kbytes
-             {:nested {:buffer (number 1024 #_=10MB)
+             {:nested {:buffer (number 10240 #_=10MB)
                        :rps    (number 1.5 #_=1.5KB/s)}}
 
              :per-ip-saved-kbytes
-             {:nested {:buffer (number 512 #_=512KB)
+             {:nested {:buffer (number 1024 #_=1MB)
                        :rps    (number 0.5 #_=1.5KB/s)}}}}
 
    :metrics {:nested
